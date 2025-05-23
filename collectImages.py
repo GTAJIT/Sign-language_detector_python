@@ -18,8 +18,7 @@ for i in range(num_of_classes):
         if not ret:
             continue
         mirrored_frame = cv2.flip(frame, 1)
-        cv2.putText(mirrored_frame, f'Class {i} - Press "s" to start saving', (50, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(mirrored_frame, f'Class {i} - Press "s" to start saving', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow('Mirrored Webcam', mirrored_frame)
         if cv2.waitKey(25) & 0xFF == ord('s'):
             break
@@ -35,8 +34,7 @@ for i in range(num_of_classes):
         if not ret:
             continue
         mirrored_frame = cv2.flip(frame, 1)
-        cv2.putText(mirrored_frame, f'Class {i} - Image {counter}', (50, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(mirrored_frame, f'{counter}', (600,450), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0), 1)
         cv2.imshow('Mirrored Webcam', mirrored_frame)
         cv2.imwrite(os.path.join(class_dir, f'{counter}.jpg'), mirrored_frame)
         counter += 1
