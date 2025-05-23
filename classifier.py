@@ -3,44 +3,45 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
-# Load the model
-model_dict = pickle.load(open('./model.p', 'rb'))
+# Load the trained model
+with open('./model.p', 'rb') as f:
+    model_dict = pickle.load(f)
 model = model_dict['model']
 
-# Try opening the camera (you can change the index if needed)
-cap = cv2.VideoCapture(0)  # Changed from 2 to 0
-
+# Initialize webcam
+cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     raise IOError("❌ Cannot open webcam. Try changing the index in `cv2.VideoCapture()`.")
 
-# Mediapipe initialization
+# Mediapipe setup
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=2,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+)
 
-hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
-
-labels_dict = {0: 'A', 1: 'B', 2: 'L'}
-
+# Main loop
 while True:
     ret, frame = cap.read()
-
-    frame = cv2.flip(frame, 1)
+    frame = cv2.flip(frame, 1)  # Mirror image
 
     if not ret or frame is None:
-        print("⚠️ Failed to grab frame from camera.")
+        print("⚠️ Frame capture failed.")
         continue
 
     H, W, _ = frame.shape
-    data_aux = []
-    x_ = []
-    y_ = []
-
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = hands.process(frame_rgb)
 
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
+    predictions = {}
+
+    if results.multi_hand_landmarks and results.multi_handedness:
+        for idx, (hand_landmarks, handedness) in enumerate(zip(results.multi_hand_landmarks, results.multi_handedness)):
+            label = handedness.classification[0].label  # 'Left' or 'Right'
             mp_drawing.draw_landmarks(
                 frame, hand_landmarks,
                 mp_hands.HAND_CONNECTIONS,
@@ -48,34 +49,37 @@ while True:
                 mp_drawing_styles.get_default_hand_connections_style()
             )
 
-        for hand_landmarks in results.multi_hand_landmarks:
-            for i in range(len(hand_landmarks.landmark)):
-                x = hand_landmarks.landmark[i].x
-                y = hand_landmarks.landmark[i].y
-                x_.append(x)
-                y_.append(y)
+            x_, y_, data_aux = [], [], []
+            for lm in hand_landmarks.landmark:
+                x_.append(lm.x)
+                y_.append(lm.y)
 
-            for i in range(len(hand_landmarks.landmark)):
-                x = hand_landmarks.landmark[i].x
-                y = hand_landmarks.landmark[i].y
-                data_aux.append(x - min(x_))
-                data_aux.append(y - min(y_))
+            for lm in hand_landmarks.landmark:
+                data_aux.append(lm.x - min(x_))
+                data_aux.append(lm.y - min(y_))
 
-        x1 = int(min(x_) * W) - 10
-        y1 = int(min(y_) * H) - 10
-        x2 = int(max(x_) * W) + 10
-        y2 = int(max(y_) * H) + 10
+            x1 = int(min(x_) * W) - 10
+            y1 = int(min(y_) * H) - 10
+            x2 = int(max(x_) * W) + 10
+            y2 = int(max(y_) * H) + 10
 
-        prediction = model.predict([np.asarray(data_aux)])
-        predicted_character = labels_dict[int(prediction[0])]
+            try:
+                prediction = model.predict([np.asarray(data_aux)])[0]
+                predictions[label] = prediction
 
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 4)
-        cv2.putText(frame, predicted_character, (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.3, (0, 0, 0), 3, cv2.LINE_AA)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 4)
+                cv2.putText(frame, f'{label}: {prediction}', (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 3, cv2.LINE_AA)
+            except Exception as e:
+                print(f"❌ Prediction error for {label} hand: {e}")
 
-    cv2.imshow('frame', frame)
+    if predictions:
+        combined = f"🖐️ Current Signs => Left: {predictions.get('Left', '-')}, Right: {predictions.get('Right', '-')}"
+        print(combined)
 
-    if cv2.waitKey(1) & 0xFF == 27:  # Press ESC to exit
+    cv2.imshow('Sign Language Classifier', frame)
+
+    if cv2.waitKey(1) & 0xFF == 27:  # ESC key to exit
         break
 
 cap.release()

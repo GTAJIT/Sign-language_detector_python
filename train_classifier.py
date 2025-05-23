@@ -1,25 +1,42 @@
 import pickle
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-import numpy as np
 
 # Load data
 try:
-    data_dict = pickle.load(open('./data.pickle', 'rb'))
+    with open('./data.pickle', 'rb') as f:
+        data_dict = pickle.load(f)
 except Exception as e:
     raise RuntimeError(f"Failed to load data.pickle: {e}")
 
-data = np.asarray(data_dict.get('data', []))
+raw_data = data_dict.get('data', [])
 labels = np.asarray(data_dict.get('labels', []))
 
-# Check if data is loaded correctly
-if len(data) == 0 or len(labels) == 0:
+# Check for empty data
+if len(raw_data) == 0 or len(labels) == 0:
     raise ValueError("No data found in data.pickle! Ensure data was saved correctly.")
 
-# Check data-label size match
+# Filter out inconsistent data lengths (e.g., expect 63 features for 21 hand landmarks with x, y, z)
+expected_length = len(raw_data[0])
+filtered_data = []
+filtered_labels = []
+
+for d, l in zip(raw_data, labels):
+    if len(d) == expected_length:
+        filtered_data.append(d)
+        filtered_labels.append(l)
+
+if len(filtered_data) == 0:
+    raise ValueError("No valid data samples after filtering inconsistent shapes.")
+
+data = np.asarray(filtered_data)
+labels = np.asarray(filtered_labels)
+
+# Final size check
 if len(data) != len(labels):
-    raise ValueError(f"Mismatch between number of data samples ({len(data)}) and labels ({len(labels)}).")
+    raise ValueError(f"Mismatch after filtering: {len(data)} samples, {len(labels)} labels.")
 
 # Split and train
 x_train, x_test, y_train, y_test = train_test_split(

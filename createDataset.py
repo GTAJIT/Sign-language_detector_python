@@ -1,21 +1,28 @@
 import os
 import pickle
-
 import mediapipe as mp
 import cv2
-import matplotlib.pyplot as plt
-
+import sys
 
 mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-
 hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
 
 DATA_DIR = './data'
 
 data = []
 labels = []
+
+# First, count total number of images
+total_images = sum(len(files) for _, _, files in os.walk(DATA_DIR))
+processed_images = 0
+
+def print_progress_bar(percent):
+    bar_length = 50
+    filled_length = int(bar_length * percent // 100)
+    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    sys.stdout.write(f'\rProcessing: |{bar}| {percent:.1f}%')
+    sys.stdout.flush()
+
 for dir_ in os.listdir(DATA_DIR):
     for img_path in os.listdir(os.path.join(DATA_DIR, dir_)):
         data_aux = []
@@ -32,7 +39,6 @@ for dir_ in os.listdir(DATA_DIR):
                 for i in range(len(hand_landmarks.landmark)):
                     x = hand_landmarks.landmark[i].x
                     y = hand_landmarks.landmark[i].y
-
                     x_.append(x)
                     y_.append(y)
 
@@ -45,6 +51,13 @@ for dir_ in os.listdir(DATA_DIR):
             data.append(data_aux)
             labels.append(dir_)
 
-f = open('data.pickle', 'wb')
-pickle.dump({'data': data, 'labels': labels}, f)
-f.close()
+        processed_images += 1
+        print_progress_bar((processed_images / total_images) * 100)
+
+# Final newline after progress bar
+print()
+
+# Save data
+with open('data.pickle', 'wb') as f:
+    pickle.dump({'data': data, 'labels': labels}, f)
+print("✅ Data successfully saved to 'data.pickle'")
